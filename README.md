@@ -1,153 +1,129 @@
-# AI Autonomous Development Platform — System Design Specification (Book)
+# AI Autonomous Development Platform
 
-This repository contains the **AI Autonomous Development Platform (AADP) System Design Specification** as a book manuscript with a static documentation build and CI for publishing.
+System design specification for a distributed, multi-agent software engineering platform. This repository documents the architecture, data models, component contracts, and operational design for a system where specialized AI agents perform the full software development lifecycle with minimal human intervention.
 
-**Version:** See [VERSION](VERSION) (v1.0)  
-**Authors:** Zahan Turel, Zenith  
-**Status:** Final — Ready for implementation  
-**License:** [MIT](LICENSE)
+This is a research and design exercise — not a product or a live system. The goal was to produce a specification rigorous enough to serve as a real implementation blueprint.
 
 ---
 
-## Repository structure
+## Why this exists
+
+Most AI coding tools operate at the file or function level. This spec asks a different question: what would a complete autonomous engineering organization look like at the infrastructure level?
+
+That means designing for: agent coordination at scale, governance before execution, persistent institutional memory, multi-tenant isolation, cost control, and observability — the same concerns any production distributed system has, applied to an AI-operated engineering team.
+
+---
+
+## What's documented
+
+### Architecture
+
+Nine canonical layers, each with defined responsibilities and inter-layer contracts:
+
+| Layer | Responsibility |
+|-------|---------------|
+| 1. Human Interaction | Dashboards, approval workflows, system control |
+| 2. Governance & Safety | Policy engine, risk evaluation, compliance — intercepts all agent actions before execution |
+| 3. Orchestration | Workflow engine (DAG), task scheduler, distributed lock manager, budget enforcement, state store, leader election |
+| 4. Model Management | Model Router, Model Registry, Prompt Governance, Cost Control |
+| 5. Agent Execution | Specialized agent roles — stateless runtime, inference via Orchestrator only |
+| 6. Knowledge Systems | Memory & Knowledge Layer (vector + graph + SQL) + Codebase Understanding System |
+| 7. Development Infrastructure | CI/CD, build systems, sandboxed execution environments |
+| 8. Deployment & Runtime | Containers, Kubernetes, production runtime |
+| 9. Observability & Telemetry | Distributed tracing, structured logging, metrics, audit logs |
+
+### Agent roles
+
+Product Manager · Architect · Backend Engineer · Frontend Engineer · QA · Security · DevOps · Research · Codebase Understanding · Memory · Self-Improvement
+
+Agents never call models directly. All inference flows: Agent → Orchestrator → Model Router → Providers.
+
+### Orchestration design
+
+- Workflow execution as DAGs (topological sort, dependency unlocking)
+- Task lifecycle: `CREATED → QUEUED → ASSIGNED → RUNNING → VALIDATION → REVIEW → DEPLOYMENT → COMPLETED`
+- Distributed lock manager (prevents concurrent writes to same resource)
+- Leader election for orchestrator HA (etcd/Consul pattern)
+- Retry policies with exponential backoff, dead-letter queues
+- Idempotency keys on all task submissions
+
+### Model Management
+
+- Model Router: selects model per request based on capability match, cost ceiling, latency constraints
+- Model Registry: capability tags per model (reasoning, coding, analysis, vision, embedding)
+- Prompt Governance: versioned prompt store, rollback, audit trail
+- Cost Control: per-task and per-project token budgets enforced before forwarding to Model Router
+
+### Memory architecture
+
+- Short-term: in-context working memory per agent session
+- Long-term: vector store (semantic search), graph store (relationships), SQL (structured facts)
+- Codebase Understanding System: semantic code index, dependency graph, change impact analysis
+- All memory partitioned by `namespace` (derived from `tenant_id` + `project_id`)
+
+### Canonical data models
+
+Full schemas defined for: `Task`, `Workflow`, `Agent`, `AgentMessage`, `MemoryEntry`, `TaskDependency`, `ModelRegistryEntry`, `InferenceRequest`, `InferenceResponse`, `AuditLogEntry`. These are the single source of truth — no duplicate definitions across layers.
+
+### Multi-tenancy
+
+Isolation boundaries: `tenant_id` → `project_id` → `namespace`. Memory stores, task queues, workflow state, and compute quotas are all namespace-scoped. RBAC enforced at policy engine.
+
+---
+
+## Architecture diagram
 
 ```
-aadp-book/
-├── VERSION                # Book version (e.g. v1.0)
-├── README.md              # This file
-├── LICENSE                # MIT
-├── requirements.txt       # Python deps for doc build (markdown)
-├── CONTRIBUTING.md        # How to contribute (tooling/docs only)
-├── CHANGELOG.md           # Tooling and repo changes
-│
-├── src/                   # Documentation source
-│   ├── SUMMARY.md         # Navigation order (sidebar hierarchy)
-│   ├── README.md          # "How to read this book"
-│   ├── index.md           # Introduction and table of contents
-│   ├── full-specification.md
-│   ├── references.md
-│   ├── book-frontmatter/  # Title page, preface
-│   └── chapters/          # Chapter Markdown files (00–30)
-│
-├── templates/             # HTML template for static site
-├── static/                # CSS (layout, print)
-├── scripts/               # Build scripts (build_docs.py, etc.)
-├── site/                  # Built static site (generated; see .gitignore)
-└── .github/workflows/     # CI: build and deploy to GitHub Pages
+                     HUMAN USERS
+                          │
+                          ▼
+                HUMAN INTERACTION LAYER
+         (Dashboards, Approvals, Control)
+                          │
+                          ▼
+             GOVERNANCE & SAFETY LAYER
+      (Policy Engine, Approval, Compliance)
+                          │
+                          ▼
+                   ORCHESTRATION LAYER
+        (Workflow DAG, Scheduler, Lock Manager,
+              Budget, State Store, Leader Election)
+                          │
+                          ▼
+              MODEL MANAGEMENT LAYER
+        (Model Router → Registry, Prompt Gov, Cost Control)
+                          │
+                          ▼
+                   AGENT EXECUTION LAYER
+          (Specialized Agents — stateless runtime)
+                          │
+                          ▼
+              KNOWLEDGE SYSTEMS LAYER
+     (Memory + Knowledge  ·  Codebase Understanding)
+                          │
+                          ▼
+          DEVELOPMENT INFRASTRUCTURE LAYER
+              (CI/CD · Build · Sandbox)
+                          │
+                          ▼
+              DEPLOYMENT & RUNTIME LAYER
+           (Containers · Kubernetes · Production)
+                          │
+                          ▼
+           OBSERVABILITY & TELEMETRY LAYER
+         (Tracing · Structured Logs · Metrics · Audit)
 ```
 
 ---
 
-## How to read the book
+## Implementation direction
 
-- **Single file:** Open [full-specification.md](src/full-specification.md) for the complete spec in one Markdown file.
-- **By chapter:** Start with [index.md](src/index.md) for the table of contents and links to every chapter.
-- **Built site:** Run the build (see below) and open `site/index.html` in a browser, or use any static file server (e.g. `python -m http.server` in `site/`).
+TypeScript. The spec is language-agnostic at the design level, but TypeScript was chosen for implementation prototyping due to strong typing, JSON-native data handling, and ecosystem fit for agent runtimes.
 
-The **Terminology Glossary** is in [src/chapters/00-terminology-and-front-matter.md](src/chapters/00-terminology-and-front-matter.md). Chapters 01–29 map to Sections 1–29 of the original specification; Chapter 30 is Appendix A.
+Key interface contracts (from the canonical data models) map directly to TypeScript interfaces. The Orchestration Layer and Model Management Layer are the critical path for any MVP implementation — everything else depends on those two being stable.
 
 ---
 
-## Building the documentation
+## Document version
 
-The documentation is built by a **static generator** (no mdBook or other framework). Output is plain HTML and CSS in **site/**.
-
-**Requirements:** Python 3 and the `markdown` package.
-
-```bash
-pip install -r requirements.txt
-python scripts/build_docs.py
-```
-
-Output is in **site/**. Open `site/index.html` in a browser or serve the folder with any static server:
-
-```bash
-cd site && python -m http.server 8000
-# Then open http://localhost:8000
-```
-
-**What the build does:**
-
-- Reads **src/SUMMARY.md** for navigation order and hierarchy (front matter, chapters, appendix, references).
-- Converts each linked Markdown file to HTML and wraps it in the layout template (header, sidebar, main content).
-- Writes **site/** with `index.html` (redirect to first page), all chapter and front-matter pages, **site/full-book.html** (single-page version for PDF export), and **site/static/** (CSS). Internal `.md` links in content are rewritten to `.html`.
-- Optional: run `python scripts/build_docs.py --pdf` to generate **site/AI-Autonomous-Development-Platform.pdf** (requires [Pandoc](https://pandoc.org/) installed).
-
----
-
-## Rebuilding chapters from source
-
-If you have the original specification as a single `.txt` file, you can regenerate `full-specification.md` and all files in `chapters/` using the split script.
-
-```bash
-python scripts/split_to_chapters.py
-# Or: python scripts/split_to_chapters.py path/to/source.txt
-```
-
----
-
-## Layout and structure
-
-The static site uses a two-column layout:
-
-- **Header:** Site title, link to home, and **Export as PDF** (links to the full-book page). On small screens, a toggle for the sidebar.
-- **Sidebar:** Persistent navigation generated from **src/SUMMARY.md** (front matter, chapters, full specification, references). Reflects the full document hierarchy including sections and subsections.
-- **Main content:** Rendered Markdown (tables, code blocks, headings). Headings get IDs for in-page links.
-
-Layout and print behavior are controlled by **static/css/layout.css**, **static/css/print.css**, and **static/css/full-book.css**. A small script toggles the sidebar on narrow viewports.
-
----
-
-## Exporting the full book as PDF
-
-You can obtain the entire documentation as a single PDF in two ways:
-
-1. **Print to PDF (no extra tools):** Open **site/full-book.html** in your browser (or use the **Export as PDF** link in the header). Use **Print → Save as PDF** (or Print → Microsoft Print to PDF on Windows). The print stylesheet hides the header and produces a continuous, book-style document with proper page breaks.
-
-2. **Pre-built PDF (optional):** If [Pandoc](https://pandoc.org/) is installed, run:
-   ```bash
-   python scripts/build_docs.py --pdf
-   ```
-   This generates **site/AI-Autonomous-Development-Platform.pdf** with all chapters in order, a table of contents, and numbered sections. The full-book page will then offer a "download the pre-built PDF" link when the file exists.
-
----
-
-## CI and GitHub Pages
-
-A GitHub Actions workflow (**.github/workflows/build-book.yml**) builds the static site and deploys it to **GitHub Pages** on every push to `main` or `master`.
-
-### Enable the live site (fixes 404)
-
-If the workflow succeeds but **https://&lt;username&gt;.github.io/&lt;repo&gt;/** returns **404**:
-
-1. Open the repo on GitHub → **Settings** → **Pages**.
-2. Under **Build and deployment**, set **Source** to **GitHub Actions** (not “Deploy from a branch”).
-3. Save. The next successful run will publish the site.
-
-### What the workflow does
-
-- Runs on push to `main` or `master`
-- Installs Python and `pip install -r requirements.txt`
-- Runs `python scripts/build_docs.py` to produce **site/**
-- Uploads **site/** as the Pages artifact and deploys via `actions/deploy-pages`
-
-The site URL is **https://&lt;username&gt;.github.io/&lt;repo&gt;/**.
-
----
-
-## Adding or reordering content
-
-1. **Add a new chapter:** Add a new `.md` file under **src/chapters/** (or another folder under **src/**) and add a link to it in **src/SUMMARY.md** in the desired position. Re-run the build.
-2. **Change order or sections:** Edit **src/SUMMARY.md**. Use `# Section title` for a section heading in the sidebar, `- [Title](path.md)` for items under a section, and `[Title](path.md)` for top-level links. Use `---` for a visual separator. Re-run the build.
-
-The sidebar and all internal links are driven by **SUMMARY.md**; no other config is needed for navigation.
-
----
-
-## Print
-
-Use the browser’s **Print → Save as PDF** on any page. **static/css/print.css** hides the sidebar and header controls so the printed output is a clean, readable document. For the full book in one PDF, open **full-book.html** and use Print → Save as PDF.
-
----
-
-*AI Autonomous Development Platform — System Design Specification — Version 1.0*
+Specification version 2.0 (Final) — authored March 2026.
